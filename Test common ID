@@ -1,0 +1,24 @@
+import pandas as pd
+
+def find_common_item_ids(item_csv_path, outfit_csv_path):
+    item_columns = ['item_id', 'cate_id', 'pic_url', 'title']
+    outfit_columns = ['outfit_id', 'item_ids']  
+
+    items_df = pd.read_csv(item_csv_path, header=None, names=item_columns)
+    outfits_df = pd.read_csv(outfit_csv_path, header=None, names=outfit_columns)
+
+    item_ids_in_items = set(items_df['item_id'])
+    outfit_item_ids = set()
+    for outfit in outfits_df['item_ids']:
+        item_ids_in_outfit = outfit.split(';')
+        outfit_item_ids.update(item_ids_in_outfit)
+
+    common_item_ids = item_ids_in_items.intersection(outfit_item_ids)
+    
+    return common_item_ids
+
+item_csv_path = 'E:\Thesis\data\item.csv' 
+outfit_csv_path = 'E:\Thesis\data\outfit.csv'
+
+common_ids = find_common_item_ids(item_csv_path, outfit_csv_path)
+print("Common item IDs:", common_ids)

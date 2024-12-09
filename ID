@@ -1,0 +1,109 @@
+import pandas as pd
+
+# Define columns for items and outfits
+item_columns = ['item_id', 'cate_id', 'pic_url', 'title']
+outfit_columns = ['outfit_id', 'item_ids'] 
+
+# Load the CSV files
+items_df = pd.read_csv('item.csv', header=None, names=item_columns)
+outfits_df = pd.read_csv('outfit.csv', header=None, names=outfit_columns)
+
+# Ensure that item_id in items_df is a string and has no leading/trailing spaces
+items_df['item_id'] = items_df['item_id'].astype(str).str.strip()
+
+# Step 1: Find all outfits containing the input item
+def find_related_outfits(input_item_id):
+    related_outfits = []
+
+    # Iterate over the outfits to find matching outfits
+    for _, outfit in outfits_df.iterrows():
+        outfit_id = outfit['outfit_id']
+        items_in_outfit = outfit['item_ids'].split(';')  # Split the 'item_ids' string by semicolon
+        
+        # Check if the input_item_id is in the current outfit
+        if input_item_id in items_in_outfit:
+            related_outfits.append({
+                "outfit_id": outfit_id,
+                "items": items_in_outfit
+            })
+    
+    return related_outfits
+
+# Step 2: Recommend items from related outfits, excluding the input item
+def recommend_items_from_outfits(related_outfits, input_item_id):
+    recommended_items = set()
+
+    # Collect all items from related outfits except the input item
+    for outfit in related_outfits:
+        items_in_outfit = outfit['items']
+        for item in items_in_outfit:
+            if item != input_item_id:
+                recommended_items.add(item)
+
+    # Step 3: Find additional items from outfits containing any of the recommended items
+    further_recommended_items = set()
+    for item_id in recommended_items:
+        for _, outfit in outfits_df.iterrows():
+            items_in_outfit = outfit['item_ids'].split(';')
+            if item_id in items_in_outfit:
+                further_recommended_items.update(items_in_outfit)
+
+    # Combine both sets of recommended items
+    all_recommended_items = recommended_items.union(further_recommended_items)
+    
+    return all_recommended_items
+
+# Step 4: Retrieve details for the recommended items (title, category, pic_url)
+def get_item_details(recommended_item_ids):
+    recommendations = []
+    for item_id in recommended_item_ids:
+        item_info_subset = items_df[items_df['item_id'] == item_id]
+        
+        if not item_info_subset.empty:
+            item_info = item_info_subset.iloc[0]
+            recommendations.append({
+                "item_id": item_id,
+                "title": item_info["title"],
+                "pic_url": item_info["pic_url"],
+                "cate_id": item_info["cate_id"]
+            })
+    
+    return recommendations
+
+# Main recommendation function
+def recommend_items(input_item_id):
+    # Step 5: Find related outfits and recommend items from those outfits
+    related_outfits = find_related_outfits(input_item_id)
+    print(f"Related outfits for item {input_item_id}:")
+    for outfit in related_outfits:
+        print(f"Outfit ID: {outfit['outfit_id']} - Items: {outfit['items']}")
+
+    # Step 6: Get the recommended items based on the related outfits
+    all_recommended_items = recommend_items_from_outfits(related_outfits, input_item_id)
+    print(f"All recommended item IDs: {all_recommended_items}")
+
+    # Step 7: Retrieve details for the recommended items
+    recommendations = get_item_details(all_recommended_items)
+    return recommendations
+
+# Main program
+input_item_id = input("Please enter the item ID: ").strip()  # Get the input item ID from the user
+
+try:
+    if input_item_id not in items_df['item_id'].values:
+        print(f"Item ID '{input_item_id}' not found in the items database.")
+    else:
+        # Get recommendations
+        recommended_items = recommend_items(input_item_id)
+        print(f"Recommended items for item {input_item_id}:")
+        if recommended_items:
+            for item in recommended_items:
+                print(f"\nItem ID: {item['item_id']}")
+                print(f"Title: {item['title']}")
+                print(f"Picture: {item['pic_url']}")
+                print(f"Category: {item['cate_id']}")
+                print("-" * 40)
+        else:
+            print("No recommended items found.")
+except ValueError:
+    print("Invalid input. Please enter a valid item ID.")

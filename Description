@@ -1,0 +1,39 @@
+import pandas as pd
+
+item_columns = ['item_id', 'cate_id', 'pic_url', 'title']
+items_df = pd.read_csv('item.csv', header=None, names=item_columns)
+
+items_df['item_id'] = items_df['item_id'].astype(str).str.strip()
+
+def recommend_items(input_item_id):
+    input_item_title = items_df[items_df['item_id'] == input_item_id]['title'].iloc[0].lower()
+    words_in_title = set(input_item_title.split())
+    recommended_items = items_df[items_df['title'].apply(lambda title: any(word in title.lower().split() for word in words_in_title))]
+    recommended_items = recommended_items[recommended_items['item_id'] != input_item_id]
+    if not recommended_items.empty:
+        recommendations = recommended_items[['item_id', 'title', 'pic_url', 'cate_id']]
+        return recommendations
+    else:
+        return "No recommended items found."
+
+input_item_id = input("Please enter the item ID: ")
+
+try:
+    input_item_id = str(input_item_id).strip()  # Ensure input is a string and no extra spaces
+    if input_item_id not in items_df['item_id'].values:
+        print(f"Item ID {input_item_id} not found in the items database.")
+    else:
+        #Recommendations
+        recommended_items = recommend_items(input_item_id)
+        
+        if isinstance(recommended_items, pd.DataFrame):
+            print(f"Recommended items for item {input_item_id}:")
+            for _, item in recommended_items.iterrows():
+                print(f"Item ID: {item['item_id']}")
+                print(f"Title: {item['title']}")
+                print(f"Picture: {item['pic_url']}")
+                print(f"Category: {item['cate_id']}\n")
+        else:
+            print(recommended_items)  #No recommended items found
+except ValueError:
+    print("Invalid input. Please enter a valid item ID.")

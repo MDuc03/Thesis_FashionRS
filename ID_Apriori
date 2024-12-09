@@ -1,0 +1,77 @@
+import pandas as pd
+from mlxtend.frequent_patterns import apriori, association_rules
+
+# Load item.csv and outfit.csv
+item_columns = ['item_id', 'cate_id', 'pic_url', 'title']
+outfit_columns = ['outfit_id', 'item_ids']  # 'item_ids' is a semicolon-separated list of item IDs
+
+# Load the CSV files
+items_df = pd.read_csv('E:\Thesis\data\item.csv', header=None, names=item_columns)
+outfits_df = pd.read_csv('E:\Thesis\data\outfit.csv', header=None, names=outfit_columns)
+
+# Step 1: Convert item_ids to a list of item sets for Apriori processing
+outfits_df['item_ids'] = outfits_df['item_ids'].apply(lambda x: x.split(';'))
+
+# Step 2: Function to find outfits containing the input item
+def find_outfits_containing_item(input_item_id):
+    related_outfits = outfits_df[outfits_df['item_ids'].apply(lambda x: input_item_id in x)]
+    return related_outfits
+
+# Step 3: Apply Apriori to outfits that contain the input item
+def apriori_recommendations(input_item_id):
+    # Step 3a: Find outfits containing the input item
+    related_outfits = find_outfits_containing_item(input_item_id)
+    
+    # Step 3b: Create a binary matrix of items in these outfits (for Apriori)
+    itemsets = []
+    for _, outfit in related_outfits.iterrows():
+        itemset = outfit['item_ids']
+        itemsets.append(itemset)
+
+    # Flatten the list of itemsets to create a one-hot encoding for Apriori
+    all_items = list(set([item for sublist in itemsets for item in sublist]))
+    one_hot_matrix = pd.DataFrame(0, columns=all_items, index=range(len(itemsets)))
+
+    for idx, itemset in enumerate(itemsets):
+        for item in itemset:
+            one_hot_matrix.at[idx, item] = 1
+
+    # Step 3c: Apply Apriori to find frequent itemsets
+    frequent_itemsets = apriori(one_hot_matrix, min_support=0.1, use_colnames=True)
+
+    # Include num_itemsets in the association_rules call
+    num_itemsets = len(frequent_itemsets)  # Get the total number of unique itemsets
+
+    # Step 3d: Generate association rules with a minimum lift of 1
+    rules = association_rules(frequent_itemsets, num_itemsets=num_itemsets, metric="lift", min_threshold=1)
+
+    # Step 3e: Extract the consequent items from the rules
+    recommended_items = set()
+    for _, rule in rules.iterrows():
+        if input_item_id in rule['antecedents']:  # If the input item is in the antecedents
+            recommended_items.update(rule['consequents'])
+
+    # Step 3f: Get item details for the recommended items
+    recommendations = items_df[items_df['item_id'].isin(recommended_items)]
+    return recommendations[['item_id', 'title', 'pic_url', 'cate_id']]
+
+# Main function to execute the recommendation process
+if __name__ == "__main__":
+    input_item_id = input("Enter the item ID: ").strip()  # Prompt for the item ID
+
+    # Ensure that the input item ID is valid
+    if input_item_id not in items_df['item_id'].values:
+        print(f"Item ID '{input_item_id}' not found in the items database.")
+    else:
+        # Get the recommendations based on the input item
+        recommended_items = apriori_recommendations(input_item_id)
+        
+        if not recommended_items.empty:
+            print(f"Recommended items for item {input_item_id}:")
+            for _, item in recommended_items.iterrows():
+                print(f"Item ID: {item['item_id']}")
+                print(f"Title: {item['title']}")
+                print(f"Picture: {item['pic_url']}")
+                print(f"Category: {item['cate_id']}\n")
+        else:
+            print("No recommended items found.")
